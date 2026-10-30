@@ -1,0 +1,56 @@
+version: '3.8'
+
+services:
+  mysql:
+    image: mysql:8.0
+    container_name: loan_app_mysql
+    environment:
+      MYSQL_ROOT_PASSWORD: root_password
+      MYSQL_USER: loan_admin
+      MYSQL_PASSWORD: secure_password_123
+      MYSQL_DATABASE: loan_application_db
+    ports:
+      - "3306:3306"
+    volumes:
+      - mysql_data:/var/lib/mysql
+      - ./database/schema.sql:/docker-entrypoint-initdb.d/schema.sql
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost"]
+      timeout: 20s
+      retries: 10
+    networks:
+      - loan_app_network
+
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: loan_app_backend
+    depends_on:
+      mysql:
+        condition: service_healthy
+    environment:
+      MYSQL_HOST: mysql
+      MYSQL_PORT: 3306
+      MYSQL_USER: loan_admin
+      MYSQL_PASSWORD: secure_password_123
+      MYSQL_DATABASE: loan_application_db
+      ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY}
+      MODEL_ID: claude-3-5-sonnet-20241022
+      DEBUG: "False"
+      LOG_LEVEL: INFO
+    ports:
+      - "8501:8501"
+      - "8080:8080"
+    volumes:
+      - ./:/app
+    networks:
+      - loan_app_network
+    command: streamlit run ui/app.py --server.port=8501 --server.address=0.0.0.0
+
+volumes:
+  mysql_data:
+
+networks:
+  loan_app_network:
+    driver: bridge
